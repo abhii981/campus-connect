@@ -168,7 +168,8 @@ def complaints_student_page(view_only=False):
             return
 
         df = pd.DataFrame(data)
-        df["Date"] = pd.to_datetime(df["Date"]).dt.strftime("%d %b %Y")
+        df["display_date"] = pd.to_datetime(df["created_at"]).dt.strftime("%d %b %Y")
+
 
         # Add status badge styling
         st.markdown("""
