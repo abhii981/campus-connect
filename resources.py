@@ -100,7 +100,7 @@ def resources_page():
     st.markdown("<div class='resources-subheader'>Study materials and reference documents</div>", unsafe_allow_html=True)
 
     conn = get_connection()
-    cursor = conn.cursor
+    cursor = conn.cursor()
 
     cursor.execute("""
         SELECT resource_title, resource_subject, file_url, created_at

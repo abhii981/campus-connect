@@ -333,7 +333,7 @@ button[data-testid="baseButton-secondary"]:hover {
                     user_id = int(user_id)
                     try:
                         conn = get_connection()
-                        cursor = conn.cursor
+                        cursor = conn.cursor()
                         cursor.execute(
                             "SELECT * FROM users WHERE user_id=%s AND password=%s",
                             (user_id, password)
@@ -467,7 +467,7 @@ button[data-testid="baseButton-secondary"]:hover {
                 else:
                     try:
                         conn = get_connection()
-                        cursor = conn.cursor
+                        cursor = conn.cursor()
                         
                         # Verify user exists with this email and enrollment number
                         cursor.execute(
