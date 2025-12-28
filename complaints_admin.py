@@ -82,13 +82,18 @@ def admin_complaints_page():
     st.markdown('<div class="complaints-subtitle">View, monitor and analyze all campus complaints</div>', unsafe_allow_html=True)
 
     conn = get_connection()
+
     query = """
         SELECT 
         complaint_id, user_id, complaint_text, category, area,
-        urgency, status, created_at from complaints order by created_at DESC"""
-    
+        urgency, status, created_at
+        FROM complaints
+        ORDER BY created_at DESC
+        """
+
     df = pd.read_sql(query, conn)
     conn.close()
+
 
     if df.empty:
         st.info("No complaints available")
