@@ -5,7 +5,6 @@ from db import get_connection
 
 def resources_page():
     
-    # Custom styling
     st.markdown("""
     <style>
     .resources-breadcrumb {
@@ -88,7 +87,6 @@ def resources_page():
         box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
     }
     
-    /* PDF iframe */
     iframe {
         border-radius: 12px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -114,7 +112,6 @@ def resources_page():
     if not resources:
         st.info("📂 No resources available yet. Check back soon!")
     else:
-        # Display resource count
         st.markdown(f"""
         <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); 
                     padding: 12px 18px; 
@@ -158,7 +155,6 @@ def resources_page():
                                 key=f"download_res_{idx}"
                             )
 
-# Full-width PDF viewer (below buttons)
                     if view_clicked:
                         with open(file_path, "rb") as f:
                             pdf_bytes = f.read()
