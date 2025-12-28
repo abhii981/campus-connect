@@ -202,7 +202,7 @@ def admin_complaints_page():
 )
 
 
-    df["date"] = pd.to_datetime(df["created_at"]).dt.date
+    df["display_date"] = pd.to_datetime(df["created_at"]).dt.date
     time_counts = df.groupby("date").size().reset_index(name="count")
 
     fig, ax = plt.subplots(figsize=(12, 5))
