@@ -154,7 +154,7 @@ def complaints_student_page(view_only=False):
                 category AS Category,
                 urgency AS Urgency,
                 status AS Status,
-                created_at AS Date
+                created_at
             FROM complaints
             WHERE user_id = %s
             ORDER BY created_at DESC
@@ -168,8 +168,7 @@ def complaints_student_page(view_only=False):
             return
 
         df = pd.DataFrame(data)
-        df["display_date"] = pd.to_datetime(df["created_at"]).dt.strftime("%d %b %Y")
-
+        df["display_date"] = pd.to_datetime(df["Date"]).dt.strftime("%d %b %Y")
 
 
         # Add status badge styling
