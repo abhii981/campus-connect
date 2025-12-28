@@ -3,7 +3,6 @@ from login import login_page
 from student import student_dashboard
 from admin import admin_dashboard
 
-# ---------------- PAGE CONFIG ----------------
 st.set_page_config(
     page_title="Campus Connect",
     page_icon="🎓",
@@ -11,7 +10,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ---------------- SESSION STATE INITIALIZATION ----------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
@@ -30,7 +28,6 @@ if not st.session_state.logged_in:
     login_page()
 
 else:
-    # ---------------- GLOBAL CSS (ONLY AFTER LOGIN) ----------------
     st.markdown("""
     <style>
     /* ================= GLOBAL SETTINGS ================= */
@@ -98,8 +95,6 @@ else:
         line-height: 1.6;
     }
 
-    /* ================= CARDS & CONTAINERS ================= */
-
     /* Card with hover effect */
     .card {
         background-color: #ffffff;
@@ -140,7 +135,6 @@ else:
         margin-left: 8px;
     }
 
-    /* ================= BADGES ================= */
 
     /* Date badge with icon */
     .badge {
@@ -239,8 +233,6 @@ else:
         color: #0f172a !important;
     }
 
-    /* ================= FILE UPLOADER ================= */
-
     /* File uploader container */
     div[data-testid="stFileUploader"] {
         background-color: #ffffff !important;
@@ -287,7 +279,6 @@ else:
         background-color: #2563eb !important;
     }
 
-    /* ================= BUTTONS ================= */
 
     /* Button styling improvement */
     .stButton > button {
@@ -396,7 +387,6 @@ else:
 </div>
 """, unsafe_allow_html=True)
     
-    # ---------------- LOGOUT (GLOBAL) ----------------
     with st.sidebar:
         st.sidebar.markdown(
             "<div class='sidebar-brand'>CAMPUS CONNECT</div>",
@@ -411,7 +401,6 @@ else:
             st.session_state.clear()
             st.rerun()
 
-    # ---------- DASHBOARD ----------
     if st.session_state.role == "admin":
         admin_dashboard()
     else:
