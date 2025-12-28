@@ -1,0 +1,114 @@
+import streamlit as st
+import os
+from db import get_connection
+from datetime import datetime
+import pandas as pd
+
+def add_notice_page():
+
+    # ---------- PAGE-SPECIFIC STYLING ----------
+    st.markdown("""
+    <style>
+    .add-notice-header {
+        font-size: 36px;
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 8px;
+    }
+
+    .add-notice-subtitle {
+        font-size: 18px;
+        color: #3b82f6;
+        font-weight: 600;
+        margin-bottom: 30px;
+    }
+
+    /* Force labels to be dark */
+    .stTextInput label,
+    .stTextArea label,
+    .stFileUploader label {
+        color: #0f172a !important;
+        font-weight: 600 !important;
+    }
+
+    /* Force textarea + input text visibility */
+    .stTextInput input,
+    .stTextArea textarea {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        -webkit-text-fill-color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+
+    /* File uploader visibility */
+    .stFileUploader section,
+    .stFileUploader section * {
+        color: #0f172a !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div class="add-notice-page">', unsafe_allow_html=True)
+
+    # ---------- HEADER ----------
+    st.markdown('<div class="add-notice-header">📢 Add Notice</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="add-notice-subtitle">Create and publish official campus notices</div>',
+        unsafe_allow_html=True
+    )
+
+    # ---------- FORM ----------
+    with st.form("add_notice_form"):
+
+        title = st.text_input("Notice Title")
+        description = st.text_area(
+            "Notice Description",
+            height=120,
+            placeholder="Enter notice details here..."
+        )
+
+        uploaded_file = st.file_uploader(
+            "Attach PDF (optional)",
+            type=["pdf"]
+        )
+
+        submit = st.form_submit_button("Publish Notice")
+
+        if submit:
+            if not title or not description:
+                st.error("⚠️ Title and description are required")
+            else:
+                try:
+                    file_path = None
+
+                    # Save PDF if uploaded
+                    if uploaded_file:
+                        file_path = uploaded_file.name
+                        with open(file_path, "wb") as f:
+                            f.write(uploaded_file.getbuffer())
+
+                    conn = get_connection()
+                    cursor = conn.cursor()
+
+                    cursor.execute("""
+                        INSERT INTO notices
+                        (title, description, notice_url, posted_by, created_at)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (
+                        title,
+                        description,
+                        file_path,
+                        st.session_state.user_id,
+                        datetime.now()
+                    ))
+
+                    conn.commit()
+                    cursor.close()
+                    conn.close()
+
+                    st.success("✅ Notice published successfully")
+
+                except Exception as e:
+                    st.error(f"❌ Error publishing notice: {str(e)}")
+
+    st.markdown('</div>', unsafe_allow_html=True)
