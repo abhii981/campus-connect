@@ -1,5 +1,6 @@
 import psycopg2
 import streamlit as st
+from psycopg2.extras import RealDictCursor
 
 def get_connection():
     return psycopg2.connect(
@@ -8,5 +9,6 @@ def get_connection():
         dbname=st.secrets["PGDATABASE"],
         user=st.secrets["PGUSER"],
         password=st.secrets["PGPASSWORD"],
-        sslmode="require"
+        sslmode="require",
+        cursor_factory=RealDictCursor
     )

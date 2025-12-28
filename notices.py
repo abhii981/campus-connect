@@ -238,7 +238,7 @@ def notices_page():
         """, unsafe_allow_html=True)
         
         conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor
 
         cursor.execute("""
             SELECT title, description, notice_url, created_at

@@ -144,7 +144,7 @@ def complaints_student_page(view_only=False):
         st.markdown('<div class="complaints-student-subtitle">Describe your issue clearly for faster resolution</div>', unsafe_allow_html=True)
 
     conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor
 
     # ---------- VIEW COMPLAINTS ----------
     if view_only:
