@@ -10,14 +10,6 @@ import json
 from google_sheets_helper import export_to_google_sheets
 
 
-@st.cache_data(ttl=60)
-def load_feedback():
-    conn = get_connection()
-    df = pd.read_sql("SELECT * FROM feedback", conn)
-    conn.close()
-    return df
-
-
 def feedback_admin_page():
 
     # ---------------- PAGE CSS ----------------
@@ -132,28 +124,39 @@ def feedback_admin_page():
     # ---------------- FETCH DATA ----------------
     try:
         conn = get_connection()
-        df = pd.read_sql(
-            "SELECT feedback_id, user_id, feedback_text, created_at FROM feedback ORDER BY created_at DESC",
-            conn
-        )
+        cursor = conn.cursor()
+        
+        # Fetch data using cursor for better control
+        cursor.execute("""
+            SELECT feedback_id, user_id, feedback_text, created_at 
+            FROM feedback 
+            ORDER BY created_at DESC
+        """)
+        
+        data = cursor.fetchall()
+        columns = [desc[0] for desc in cursor.description]
+        
+        cursor.close()
         conn.close()
 
-        if df.empty:
+        if not data or len(data) == 0:
             st.info("📋 No feedback submitted yet")
             return
+
+        # Create DataFrame with proper column names
+        df = pd.DataFrame(data, columns=columns)
 
         # ---------------- TABLE ----------------
         st.markdown('<div class="section-header">📋 All Feedback</div>', unsafe_allow_html=True)
 
         display_df = df.copy()
         
-        # Convert created_at to datetime with error handling for PostgreSQL
+        # Convert created_at to datetime with PostgreSQL handling
         try:
-            display_df["created_at"] = pd.to_datetime(display_df["created_at"], errors='coerce').dt.strftime("%d %b %Y")
+            display_df["created_at"] = pd.to_datetime(display_df["created_at"], errors='coerce')
+            display_df["created_at"] = display_df["created_at"].dt.strftime("%d %b %Y")
         except Exception as e:
-            # If conversion fails, keep original format
             st.warning(f"Date formatting issue: {str(e)}")
-            pass
 
         st.dataframe(display_df, use_container_width=True, hide_index=True)
 
@@ -173,9 +176,16 @@ def feedback_admin_page():
                         st.error(f"❌ Export failed: {str(e)}")
 
         with col2:
+            # Create CSV with proper date formatting
+            csv_df = df.copy()
+            try:
+                csv_df["created_at"] = pd.to_datetime(csv_df["created_at"], errors='coerce').dt.strftime("%d %b %Y")
+            except:
+                pass
+                
             st.download_button(
                 "📄 Download CSV",
-                data=df.to_csv(index=False),
+                data=csv_df.to_csv(index=False),
                 file_name="feedback.csv",
                 mime="text/csv",
                 use_container_width=True,
@@ -184,53 +194,73 @@ def feedback_admin_page():
         
         st.markdown('</div>', unsafe_allow_html=True)
 
+        # Check if there's any feedback text to analyze
+        if df["feedback_text"].notna().sum() == 0:
+            st.warning("⚠️ No feedback text available for analysis")
+            return
+
         # ---------------- GEMINI AI SUMMARY ----------------
         st.markdown('<div class="section-header">🧠 AI Feedback Insights</div>', unsafe_allow_html=True)
 
-        combined_feedback = "\n".join(df["feedback_text"].tolist())
+        # Filter out null feedback texts
+        valid_feedback = df[df["feedback_text"].notna()]["feedback_text"].tolist()
+        
+        if len(valid_feedback) > 0:
+            combined_feedback = "\n".join(valid_feedback)
 
-        with st.spinner("Analyzing feedback with Gemini AI..."):
-            try:
-                ai_result = analyze_feedback_summary(combined_feedback)
+            with st.spinner("Analyzing feedback with Gemini AI..."):
+                try:
+                    ai_result = analyze_feedback_summary(combined_feedback)
 
-                st.markdown(f"""
-                <div class="ai-card">
-                    <div class="ai-title">🤖 AI Summary</div>
-                    <div class="ai-text">{ai_result}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                    st.markdown(f"""
+                    <div class="ai-card">
+                        <div class="ai-title">🤖 AI Summary</div>
+                        <div class="ai-text">{ai_result}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-                # ---------------- VOICE FEATURE ----------------
-                st.markdown('<div class="section-header">🔊 Listen to AI Summary</div>', unsafe_allow_html=True)
+                    # ---------------- VOICE FEATURE ----------------
+                    st.markdown('<div class="section-header">🔊 Listen to AI Summary</div>', unsafe_allow_html=True)
 
-                if st.button("▶️ Play Voice Summary", key="voice_btn"):
-                    safe_text = json.dumps(ai_result)
+                    if st.button("▶️ Play Voice Summary", key="voice_btn"):
+                        safe_text = json.dumps(ai_result)
 
-                    components.html(
-                        f"""
-                        <script>
-                            const msg = new SpeechSynthesisUtterance({safe_text});
-                            msg.rate = 0.95;
-                            msg.pitch = 1;
-                            msg.volume = 1;
+                        components.html(
+                            f"""
+                            <script>
+                                const msg = new SpeechSynthesisUtterance({safe_text});
+                                msg.rate = 0.95;
+                                msg.pitch = 1;
+                                msg.volume = 1;
 
-                            window.speechSynthesis.cancel();
-                            window.speechSynthesis.speak(msg);
-                        </script>
-                        """,
-                        height=0
-                    )
-            except Exception as e:
-                st.error(f"❌ AI analysis failed: {str(e)}")
+                                window.speechSynthesis.cancel();
+                                window.speechSynthesis.speak(msg);
+                            </script>
+                            """,
+                            height=0
+                        )
+                except Exception as e:
+                    st.error(f"❌ AI analysis failed: {str(e)}")
+        else:
+            st.info("No valid feedback available for AI analysis")
 
         # ---------------- SENTIMENT ANALYSIS (BASIC) ----------------
         st.markdown('<div class="section-header">📊 Feedback Sentiment Overview</div>', unsafe_allow_html=True)
 
+        # Filter out null values for sentiment analysis
+        sentiment_df = df[df["feedback_text"].notna()].copy()
+        
+        if len(sentiment_df) == 0:
+            st.info("No feedback available for sentiment analysis")
+            return
+
         # Simple keyword-based sentiment (safe + explainable)
-        positive_keywords = ["good", "great", "helpful", "useful", "excellent", "nice", "love", "amazing", "wonderful"]
-        negative_keywords = ["bad", "poor", "issue", "problem", "slow", "worst", "delay", "terrible", "horrible"]
+        positive_keywords = ["good", "great", "helpful", "useful", "excellent", "nice", "love", "amazing", "wonderful", "best", "perfect"]
+        negative_keywords = ["bad", "poor", "issue", "problem", "slow", "worst", "delay", "terrible", "horrible", "disappointed", "useless"]
 
         def classify_sentiment(text):
+            if pd.isna(text):
+                return "Neutral"
             text = str(text).lower()
             if any(word in text for word in positive_keywords):
                 return "Positive"
@@ -238,21 +268,29 @@ def feedback_admin_page():
                 return "Negative"
             return "Neutral"
 
-        df["sentiment"] = df["feedback_text"].apply(classify_sentiment)
-        sentiment_counts = df["sentiment"].value_counts()
+        sentiment_df["sentiment"] = sentiment_df["feedback_text"].apply(classify_sentiment)
+        sentiment_counts = sentiment_df["sentiment"].value_counts()
+
+        if len(sentiment_counts) == 0:
+            st.info("No sentiment data available")
+            return
 
         # ---------------- PIE CHART ----------------
         fig, ax = plt.subplots(figsize=(8, 8))
-        colors = ["#22c55e", "#ef4444", "#facc15"]
-        explode = (0.05, 0.05, 0.05) if len(sentiment_counts) == 3 else tuple([0.05] * len(sentiment_counts))
+        
+        # Define colors for each sentiment
+        color_map = {"Positive": "#22c55e", "Negative": "#ef4444", "Neutral": "#facc15"}
+        colors = [color_map.get(label, "#94a3b8") for label in sentiment_counts.index]
+        
+        explode = tuple([0.05] * len(sentiment_counts))
         
         wedges, texts, autotexts = ax.pie(
             sentiment_counts.values,
             labels=sentiment_counts.index,
             autopct='%1.1f%%',
             startangle=90,
-            colors=colors[:len(sentiment_counts)],
-            explode=explode[:len(sentiment_counts)],
+            colors=colors,
+            explode=explode,
             shadow=True,
             textprops={'fontsize': 12, 'weight': 'bold', 'color': '#0f172a'}
         )
@@ -273,18 +311,25 @@ def feedback_admin_page():
         
         col1, col2, col3 = st.columns(3)
         
+        total_feedback = len(sentiment_df)
+        
         with col1:
             positive_count = sentiment_counts.get("Positive", 0)
-            st.metric("😊 Positive", f"{positive_count}", f"{(positive_count/len(df)*100):.1f}%")
+            positive_pct = (positive_count/total_feedback*100) if total_feedback > 0 else 0
+            st.metric("😊 Positive", f"{positive_count}", f"{positive_pct:.1f}%")
         
         with col2:
             negative_count = sentiment_counts.get("Negative", 0)
-            st.metric("😞 Negative", f"{negative_count}", f"{(negative_count/len(df)*100):.1f}%")
+            negative_pct = (negative_count/total_feedback*100) if total_feedback > 0 else 0
+            st.metric("😞 Negative", f"{negative_count}", f"{negative_pct:.1f}%")
         
         with col3:
             neutral_count = sentiment_counts.get("Neutral", 0)
-            st.metric("😐 Neutral", f"{neutral_count}", f"{(neutral_count/len(df)*100):.1f}%")
+            neutral_pct = (neutral_count/total_feedback*100) if total_feedback > 0 else 0
+            st.metric("😐 Neutral", f"{neutral_count}", f"{neutral_pct:.1f}%")
     
     except Exception as e:
         st.error(f"❌ Error loading feedback data: {str(e)}")
         st.info("Please check your database connection and table structure.")
+        import traceback
+        st.code(traceback.format_exc())
