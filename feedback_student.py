@@ -108,11 +108,16 @@ def feedback_student_page():
                 conn = get_connection()
                 cursor = conn.cursor()
 
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO feedback (user_id, feedback_text)
                     VALUES (%s, %s)
-                """, (st.session_state.user_id, feedback))
-
+                    """,
+            (
+                st.session_state.user_id,
+                feedback
+            )
+        )
                 conn.commit()
                 conn.close()
 
