@@ -289,9 +289,13 @@ def notices_page():
                     file_path = n["notice_url"]
                     if file_path and os.path.exists(file_path):
                         if st.button("📄 View Notice", key=f"notice_{idx}", use_container_width=True):
-                            with open(file_path, "rb") as f:
-                                pdf_bytes = f.read()
-                                base64_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
+                            st.download_button(
+                                label="📄 Download Notice",
+                                data=row["file_data"],
+                                file_name=row["file_name"],
+                                mime="application/pdf"
+                            )
+
 
                             st.markdown(
                                 f"""
@@ -302,15 +306,15 @@ def notices_page():
                             )
                         
                         # Download button
-                        with open(file_path, "rb") as f:
-                            st.download_button(
-                                "⬇️ Download",
-                                data=f.read(),
-                                file_name=os.path.basename(file_path),
-                                mime="application/pdf",
-                                key=f"download_notice_{idx}",
-                                use_container_width=True
-                            )
+                        st.download_button(
+                        label="📄 Download Notice",
+                        data=row["file_data"],
+                        file_name=row["file_name"],
+                        mime="application/pdf",
+                        key=f"download_notice_{idx}",
+                        use_container_width=True
+                        )
+
                     else:
                         st.warning("⚠️ File not found")
 
