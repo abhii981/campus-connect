@@ -11,8 +11,6 @@ def load_feedback():
     conn.close()
     return df
 
-df = load_feedback()
-
 def admin_complaints_page():
     # Custom styling for this page
     st.markdown("""
@@ -94,14 +92,15 @@ def admin_complaints_page():
     df = pd.read_sql(query, conn)
     conn.close()
 
-
     if df.empty:
         st.info("No complaints available")
         return
     
     st.markdown('<div class="section-header">📋 All Complaints</div>', unsafe_allow_html=True)
     display_df = df.copy()
-    display_df["created_at"] = pd.to_datetime(display_df["created_at"]).dt.strftime("%d %b %Y %H:%M")
+    
+    # Convert created_at to datetime and format properly for PostgreSQL
+    display_df["created_at"] = pd.to_datetime(display_df["created_at"], errors='coerce').dt.strftime("%d %b %Y %H:%M")
 
     st.dataframe(
         display_df,
@@ -144,9 +143,9 @@ def admin_complaints_page():
 
     with col1:
         st.markdown(
-    "<div style='font-size:18px; font-weight:700; color:#0f172a; margin-bottom:10px;'>📍 Complaints by Area</div>",
-    unsafe_allow_html=True
-)
+            "<div style='font-size:18px; font-weight:700; color:#0f172a; margin-bottom:10px;'>📍 Complaints by Area</div>",
+            unsafe_allow_html=True
+        )
         area_counts = df["area"].value_counts()
 
         fig, ax = plt.subplots(figsize=(8, 6))
@@ -170,9 +169,9 @@ def admin_complaints_page():
 
     with col2:
         st.markdown(
-    "<div style='font-size:18px; font-weight:700; color:#0f172a; margin-bottom:10px;'>🏷 Complaints by Category</div>",
-    unsafe_allow_html=True
-)
+            "<div style='font-size:18px; font-weight:700; color:#0f172a; margin-bottom:10px;'>🏷 Complaints by Category</div>",
+            unsafe_allow_html=True
+        )
 
         category_counts = df["category"].value_counts()
 
@@ -197,18 +196,18 @@ def admin_complaints_page():
         st.pyplot(fig)
     
     st.markdown(
-    "<div style='font-size:18px; font-weight:700; color:#0f172a; margin-bottom:10px;'>⏱ Complaints Over Time</div>",
-    unsafe_allow_html=True
-)
+        "<div style='font-size:18px; font-weight:700; color:#0f172a; margin-bottom:10px;'>⏱ Complaints Over Time</div>",
+        unsafe_allow_html=True
+    )
 
-
-    df["display_date"] = pd.to_datetime(df["created_at"]).dt.date
-    time_counts = df.groupby("date").size().reset_index(name="count")
+    # Create a proper date column for time series
+    df["display_date"] = pd.to_datetime(df["created_at"], errors='coerce').dt.date
+    time_counts = df.groupby("display_date").size().reset_index(name="count")
 
     fig, ax = plt.subplots(figsize=(12, 5))
     sns.lineplot(
         data=time_counts,
-        x="date",
+        x="display_date",
         y="count",
         marker="o",
         ax=ax,

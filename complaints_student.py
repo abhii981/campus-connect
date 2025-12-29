@@ -150,11 +150,11 @@ def complaints_student_page(view_only=False):
     if view_only:
         cursor.execute("""
             SELECT 
-                complaint_text AS Complaint,
-                category AS Category,
-                urgency AS Urgency,
-                status AS Status,
-                created_at
+                complaint_text AS "Complaint",
+                category AS "Category",
+                urgency AS "Urgency",
+                status AS "Status",
+                created_at AS "Date"
             FROM complaints
             WHERE user_id = %s
             ORDER BY created_at DESC
@@ -167,9 +167,10 @@ def complaints_student_page(view_only=False):
             st.info("📋 You have not submitted any complaints yet.")
             return
 
-        df = pd.DataFrame(data)
-        df["display_date"] = pd.to_datetime(df["Date"]).dt.strftime("%d %b %Y")
-
+        df = pd.DataFrame(data, columns=["Complaint", "Category", "Urgency", "Status", "Date"])
+        
+        # Convert created_at to datetime and format
+        df["Date"] = pd.to_datetime(df["Date"], errors='coerce').dt.strftime("%d %b %Y")
 
         # Add status badge styling
         st.markdown("""
