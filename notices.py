@@ -237,88 +237,120 @@ def notices_page():
         </div>
         """, unsafe_allow_html=True)
         
-        conn = get_connection()
-        cursor = conn.cursor()
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
 
-        cursor.execute("""
-            SELECT title, description, notice_url, created_at
-            FROM notices
-            ORDER BY created_at DESC
-        """)
-        notices = cursor.fetchall()
-        cursor.close()
-        conn.close()
-
-        if not notices:
-            st.info("📭 No notices available yet.")
-        else:
-            # Display notice count
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%); 
-                        padding: 10px 16px; 
-                        border-radius: 10px; 
-                        margin-bottom: 18px;
-                        border-left: 4px solid #3b82f6;">
-                <span style="color: #1e40af; font-weight: 600; font-size: 13px;">
-                    📊 Total: <strong>{len(notices)}</strong> notices
-                </span>
-            </div>
-            """, unsafe_allow_html=True)
+            # Fixed: Changed notice_url to file_data and file_name
+            cursor.execute("""
+                SELECT notice_id, title, description, file_data, file_name, created_at
+                FROM notices
+                ORDER BY created_at DESC
+            """)
+            notices = cursor.fetchall()
             
-            for idx, n in enumerate(notices):
-                with st.container():
-                    st.markdown("<div class='notices-card'>", unsafe_allow_html=True)
+            # Get column names
+            columns = [desc[0] for desc in cursor.description]
+            
+            cursor.close()
+            conn.close()
 
-                    # Check if notice is new (within last 7 days)
-                    is_new = False
-                    if n["created_at"]:
-                        date_str = n['created_at'].strftime('%d %b %Y')
-                        days_old = (datetime.now() - n["created_at"]).days
-                        is_new = days_old <= 7
+            if not notices or len(notices) == 0:
+                st.info("📭 No notices available yet.")
+            else:
+                # Display notice count
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%); 
+                            padding: 10px 16px; 
+                            border-radius: 10px; 
+                            margin-bottom: 18px;
+                            border-left: 4px solid #3b82f6;">
+                    <span style="color: #1e40af; font-weight: 600; font-size: 13px;">
+                        📊 Total: <strong>{len(notices)}</strong> notices
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                for idx, n_tuple in enumerate(notices):
+                    # Convert tuple to dictionary
+                    n = dict(zip(columns, n_tuple))
+                    
+                    with st.container():
+                        st.markdown("<div class='notices-card'>", unsafe_allow_html=True)
+
+                        # Check if notice is new (within last 7 days)
+                        is_new = False
+                        if n.get("created_at"):
+                            try:
+                                # Handle both datetime objects and strings
+                                if isinstance(n["created_at"], str):
+                                    notice_date = datetime.strptime(n["created_at"], "%Y-%m-%d %H:%M:%S")
+                                else:
+                                    notice_date = n["created_at"]
+                                
+                                date_str = notice_date.strftime('%d %b %Y')
+                                days_old = (datetime.now() - notice_date).days
+                                is_new = days_old <= 7
+                                
+                                new_badge = "<span class='new-indicator'>New</span>" if is_new else ""
+                                
+                                st.markdown(
+                                    f"<div class='notices-badge'>📅 {date_str}{new_badge}</div>",
+                                    unsafe_allow_html=True
+                                )
+                            except:
+                                pass
+
+                        st.markdown(f"<div class='notices-title'>{n.get('title', 'Untitled')}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='notices-desc'>{n.get('description', '')}</div>", unsafe_allow_html=True)
+
+                        # Check if there's an attached file
+                        has_file = n.get("file_data") is not None and n.get("file_name")
                         
-                        new_badge = "<span class='new-indicator'>New</span>" if is_new else ""
-                        
-                        st.markdown(
-                            f"<div class='notices-badge'>📅 {date_str}{new_badge}</div>",
-                            unsafe_allow_html=True
-                        )
+                        if has_file:
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                # View button - show PDF in iframe
+                                if st.button("👁️ View PDF", key=f"view_notice_{idx}", use_container_width=True):
+                                    try:
+                                        # Convert binary data to base64
+                                        file_bytes = bytes(n["file_data"])
+                                        base64_pdf = base64.b64encode(file_bytes).decode('utf-8')
+                                        
+                                        st.markdown(
+                                            f"""
+                                            <iframe src="data:application/pdf;base64,{base64_pdf}"
+                                            width="100%" height="600px" style="border:none; border-radius: 12px; margin-top: 10px;"></iframe>
+                                            """,
+                                            unsafe_allow_html=True
+                                        )
+                                    except Exception as e:
+                                        st.error(f"Error displaying PDF: {str(e)}")
+                            
+                            with col2:
+                                # Download button
+                                try:
+                                    file_bytes = bytes(n["file_data"])
+                                    st.download_button(
+                                        label="📥 Download PDF",
+                                        data=file_bytes,
+                                        file_name=n.get("file_name", "notice.pdf"),
+                                        mime="application/pdf",
+                                        key=f"download_notice_{idx}",
+                                        use_container_width=True
+                                    )
+                                except Exception as e:
+                                    st.error(f"Download error: {str(e)}")
+                        else:
+                            st.info("📄 No PDF attached to this notice")
 
-                    st.markdown(f"<div class='notices-title'>{n['title']}</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='notices-desc'>{n['description']}</div>", unsafe_allow_html=True)
-
-                    file_path = n["notice_url"]
-                    if file_path and os.path.exists(file_path):
-                        if st.button("📄 View Notice", key=f"notice_{idx}", use_container_width=True):
-                            st.download_button(
-                                label="📄 Download Notice",
-                                data=row["file_data"],
-                                file_name=row["file_name"],
-                                mime="application/pdf"
-                            )
-
-
-                            st.markdown(
-                                f"""
-                                <iframe src="data:application/pdf;base64,{base64_pdf}"
-                                width="100%" height="400px" style="border:none;"></iframe>
-                                """,
-                                unsafe_allow_html=True
-                            )
-                        
-                        # Download button
-                        st.download_button(
-                        label="📄 Download Notice",
-                        data=row["file_data"],
-                        file_name=row["file_name"],
-                        mime="application/pdf",
-                        key=f"download_notice_{idx}",
-                        use_container_width=True
-                        )
-
-                    else:
-                        st.warning("⚠️ File not found")
-
-                    st.markdown("</div>", unsafe_allow_html=True)
+                        st.markdown("</div>", unsafe_allow_html=True)
+        
+        except Exception as e:
+            st.error(f"❌ Error loading notices: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
     
     # ==================== SEPARATOR ====================
     with separator:
@@ -344,9 +376,9 @@ def notices_page():
         </div>
         """, unsafe_allow_html=True)
         
-        conn = get_connection()
-        
         try:
+            conn = get_connection()
+            
             events_df = pd.read_sql("""
                 SELECT title, description, event_date, venue
                 FROM club_events
@@ -355,7 +387,7 @@ def notices_page():
             conn.close()
         except Exception as e:
             conn.close()
-            st.error(f"Error loading events: {str(e)}")
+            st.error(f"❌ Error loading events: {str(e)}")
             events_df = pd.DataFrame()
 
         if events_df.empty:
@@ -377,12 +409,14 @@ def notices_page():
             for _, row in events_df.iterrows():
                 # Format date
                 try:
-                    if isinstance(row['event_date'], str):
+                    if pd.isna(row['event_date']):
+                        event_date_formatted = "Date TBA"
+                    elif isinstance(row['event_date'], str):
                         event_date_formatted = row['event_date']
                     else:
                         event_date_formatted = row['event_date'].strftime('%d %b %Y')
                 except:
-                    event_date_formatted = str(row['event_date'])
+                    event_date_formatted = "Date TBA"
                 
                 st.markdown(f"""
                 <div class="club-event-card">
