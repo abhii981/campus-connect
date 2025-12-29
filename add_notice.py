@@ -1,8 +1,7 @@
 import streamlit as st
-import os
 from db import get_connection
 from datetime import datetime
-import pandas as pd
+import psycopg2
 
 def add_notice_page():
 
@@ -23,7 +22,6 @@ def add_notice_page():
         margin-bottom: 30px;
     }
 
-    /* Force labels to be dark */
     .stTextInput label,
     .stTextArea label,
     .stFileUploader label {
@@ -31,7 +29,6 @@ def add_notice_page():
         font-weight: 600 !important;
     }
 
-    /* Force textarea + input text visibility */
     .stTextInput input,
     .stTextArea textarea {
         background-color: #ffffff !important;
@@ -40,15 +37,12 @@ def add_notice_page():
         border: 1px solid #cbd5e1 !important;
     }
 
-    /* File uploader visibility */
     .stFileUploader section,
     .stFileUploader section * {
         color: #0f172a !important;
     }
     </style>
     """, unsafe_allow_html=True)
-
-    st.markdown('<div class="add-notice-page">', unsafe_allow_html=True)
 
     # ---------- HEADER ----------
     st.markdown('<div class="add-notice-header">📢 Add Notice</div>', unsafe_allow_html=True)
@@ -77,38 +71,37 @@ def add_notice_page():
         if submit:
             if not title or not description:
                 st.error("⚠️ Title and description are required")
-            else:
-                try:
-                    file_path = None
+                return
 
-                    # Save PDF if uploaded
-                    if uploaded_file:
-                        file_path = uploaded_file.name
-                        with open(file_path, "wb") as f:
-                            f.write(uploaded_file.getbuffer())
+            try:
+                file_bytes = None
+                file_name = None
 
-                    conn = get_connection()
-                    cursor = conn.cursor()
+                if uploaded_file:
+                    file_bytes = uploaded_file.read()
+                    file_name = uploaded_file.name
 
-                    cursor.execute("""
-                        INSERT INTO notices
-                        (title, description, notice_url, posted_by, created_at)
-                        VALUES (%s, %s, %s, %s, %s)
-                    """, (
-                        title,
-                        description,
-                        file_path,
-                        st.session_state.user_id,
-                        datetime.now()
-                    ))
+                conn = get_connection()
+                cursor = conn.cursor()
 
-                    conn.commit()
-                    cursor.close()
-                    conn.close()
+                cursor.execute("""
+                    INSERT INTO notices
+                    (title, description, file_data, file_name, posted_by, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (
+                    title,
+                    description,
+                    psycopg2.Binary(file_bytes) if file_bytes else None,
+                    file_name,
+                    st.session_state.user_id,
+                    datetime.now()
+                ))
 
-                    st.success("✅ Notice published successfully")
+                conn.commit()
+                cursor.close()
+                conn.close()
 
-                except Exception as e:
-                    st.error(f"❌ Error publishing notice: {str(e)}")
+                st.success("✅ Notice published successfully")
 
-    st.markdown('</div>', unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"❌ Error publishing notice: {str(e)}")
