@@ -320,17 +320,27 @@ def notices_page():
                         if has_file:
                             # Always show download button first
                             try:
-                                # Handle PostgreSQL bytea - it might be memoryview, bytes, or bytearray
+                                # Handle PostgreSQL bytea - different formats
                                 file_data = n["file_data"]
                                 
-                                if isinstance(file_data, memoryview):
+                                # PostgreSQL can return bytea as hex string (starts with \x) or as bytes
+                                if isinstance(file_data, str):
+                                    # It's a hex string like '\x255044462d...'
+                                    # Remove the '\x' prefix and convert hex to bytes
+                                    if file_data.startswith('\\x'):
+                                        hex_str = file_data[2:]  # Remove '\x'
+                                        file_bytes = bytes.fromhex(hex_str)
+                                    else:
+                                        # Try to encode as bytes
+                                        file_bytes = file_data.encode('latin-1')
+                                elif isinstance(file_data, memoryview):
                                     file_bytes = bytes(file_data)
                                 elif isinstance(file_data, bytearray):
                                     file_bytes = bytes(file_data)
                                 elif isinstance(file_data, bytes):
                                     file_bytes = file_data
                                 else:
-                                    # Try to convert to bytes
+                                    # Last resort - try to convert to bytes
                                     file_bytes = bytes(file_data)
                                 
                                 col1, col2 = st.columns(2)
