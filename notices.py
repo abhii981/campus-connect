@@ -280,13 +280,20 @@ def notices_page():
 
                         # Check if notice is new (within last 7 days)
                         is_new = False
+                        date_str = "Unknown date"
+                        
                         if n.get("created_at"):
                             try:
-                                # Handle both datetime objects and strings
-                                if isinstance(n["created_at"], str):
-                                    notice_date = datetime.strptime(n["created_at"], "%Y-%m-%d %H:%M:%S")
+                                created_at = n["created_at"]
+                                # Handle PostgreSQL timestamp
+                                if hasattr(created_at, 'strftime'):
+                                    # It's already a datetime object
+                                    notice_date = created_at
+                                elif isinstance(created_at, str):
+                                    # Try to parse string
+                                    notice_date = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
                                 else:
-                                    notice_date = n["created_at"]
+                                    notice_date = datetime.now()
                                 
                                 date_str = notice_date.strftime('%d %b %Y')
                                 days_old = (datetime.now() - notice_date).days
@@ -298,11 +305,14 @@ def notices_page():
                                     f"<div class='notices-badge'>📅 {date_str}{new_badge}</div>",
                                     unsafe_allow_html=True
                                 )
-                            except:
-                                pass
+                            except Exception as e:
+                                st.markdown(
+                                    f"<div class='notices-badge'>📅 {date_str}</div>",
+                                    unsafe_allow_html=True
+                                )
 
                         st.markdown(f"<div class='notices-title'>{n.get('title', 'Untitled')}</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='notices-desc'>{n.get('description', '')}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='notices-desc'>{n.get('description', 'No description')}</div>", unsafe_allow_html=True)
 
                         # Check if there's an attached file
                         has_file = n.get("file_data") is not None and n.get("file_name")
