@@ -1,12 +1,34 @@
 import streamlit as st
 from db import get_connection
-from club_utils import is_club_member
 
 def add_club_event_page():
 
     # 🔐 Hard security check
-    if not is_club_member(st.session_state.user_id):
-        st.error("🚫 Unauthorized access - This page is only accessible to club members")
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Check if user is a club member and get their club_id
+        cursor.execute("""
+            SELECT club_id, role_club 
+            FROM club_users 
+            WHERE user_id = %s
+        """, (st.session_state.user_id,))
+        
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not result:
+            st.error("🚫 Unauthorized access - This page is only accessible to club members")
+            st.stop()
+        
+        # Store club_id in session state for use in form submission
+        st.session_state.user_club_id = result[0]
+        st.session_state.user_club_role = result[1]
+        
+    except Exception as e:
+        st.error(f"Error verifying club membership: {str(e)}")
         st.stop()
 
     # Custom styling
@@ -100,11 +122,29 @@ def add_club_event_page():
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
         border: 1px solid #f3e8ff;
     }
+    
     /* Tips section text fix */
     .tips-section, .tips-section * {
-    color: #0f172a !important;
+        color: #0f172a !important;
     }
-
+    
+    /* Form submit button */
+    button[type="submit"] {
+        background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%) !important;
+        color: white !important;
+        border: none !important;
+        padding: 14px 32px !important;
+        border-radius: 12px !important;
+        font-weight: 600 !important;
+        font-size: 16px !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    button[type="submit"]:hover {
+        background: linear-gradient(135deg, #9333ea 0%, #7e22ce 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(168, 85, 247, 0.4) !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -113,11 +153,11 @@ def add_club_event_page():
     st.markdown('<div class="club-event-subtitle">Share your upcoming events with the campus community</div>', unsafe_allow_html=True)
 
     # Info card
-    st.markdown("""
+    st.markdown(f"""
     <div class="club-info-card">
-        <div class="club-info-title">🎯 For Club Members Only</div>
+        <div class="club-info-title">🎯 Club Member Access</div>
         <div class="club-info-text">
-            This section is exclusively for registered club and society members to announce their events. 
+            You are logged in as a <strong>{st.session_state.user_club_role}</strong>. 
             Your event will be visible to all students on the Notices page once published.
         </div>
     </div>
@@ -126,7 +166,7 @@ def add_club_event_page():
     # Form in a styled container
     st.markdown('<div class="form-container">', unsafe_allow_html=True)
     
-    with st.form("add_club_event_form"):
+    with st.form("add_club_event_form", clear_on_submit=True):
         st.markdown(
             "<h3 style='color:#0f172a; font-weight:700;'>📝 Event Details</h3>",
             unsafe_allow_html=True
@@ -159,23 +199,24 @@ def add_club_event_page():
         submit = st.form_submit_button("🚀 Publish Event", use_container_width=True)
 
         if submit:
-            if not title or not description or not venue:
+            if not title.strip() or not description.strip() or not venue.strip():
                 st.error("⚠️ All fields are required. Please fill in all details.")
             else:
                 try:
                     conn = get_connection()
                     cursor = conn.cursor()
 
+                    # Use club_id instead of user_id for the foreign key
                     cursor.execute("""
                         INSERT INTO club_events
                         (title, description, event_date, venue, created_by)
                         VALUES (%s, %s, %s, %s, %s)
                     """, (
-                        title,
-                        description,
+                        title.strip(),
+                        description.strip(),
                         event_date,
-                        venue,
-                        st.session_state.user_id
+                        venue.strip(),
+                        st.session_state.user_club_id  # This is the club_id, not user_id
                     ))
 
                     conn.commit()
@@ -187,6 +228,9 @@ def add_club_event_page():
                     
                 except Exception as e:
                     st.error(f"❌ Error publishing event: {str(e)}")
+                    import traceback
+                    with st.expander("View error details"):
+                        st.code(traceback.format_exc())
     
     st.markdown('</div>', unsafe_allow_html=True)
     

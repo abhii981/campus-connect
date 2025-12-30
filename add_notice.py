@@ -3,139 +3,56 @@ from db import get_connection
 from datetime import datetime
 import psycopg2
 
-def add_club_event_page():
+def add_notice_page():
 
-    # 🔐 Hard security check
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        
-        # Check if user is a club member and get their club_id
-        cursor.execute("""
-            SELECT club_id, role_club 
-            FROM club_users 
-            WHERE user_id = %s
-        """, (st.session_state.user_id,))
-        
-        result = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        
-        if not result:
-            st.error("🚫 Unauthorized access - This page is only accessible to club members")
-            st.stop()
-        
-        # Store club_id in session state for use in form submission
-        st.session_state.user_club_id = result[0]
-        st.session_state.user_club_role = result[1]
-        
-    except Exception as e:
-        st.error(f"Error verifying club membership: {str(e)}")
-        st.stop()
-
-    # Custom styling
+    # ---------- PAGE-SPECIFIC STYLING ----------
     st.markdown("""
     <style>
-    .club-event-header {
+    .add-notice-header {
         font-size: 36px;
         font-weight: 800;
         color: #0f172a;
         margin-bottom: 8px;
     }
-    
-    .club-event-subtitle {
-        font-size: 16px;
-        color: #64748b;
-        font-weight: 500;
+
+    .add-notice-subtitle {
+        font-size: 18px;
+        color: #3b82f6;
+        font-weight: 600;
         margin-bottom: 30px;
     }
-    
-    /* Form inputs */
-    .stTextInput input, .stTextArea textarea, .stDateInput input {
+
+    .stTextInput label,
+    .stTextArea label,
+    .stFileUploader label {
+        color: #0f172a !important;
+        font-weight: 600 !important;
+    }
+
+    .stTextInput input,
+    .stTextArea textarea {
         background-color: #ffffff !important;
         color: #0f172a !important;
         -webkit-text-fill-color: #0f172a !important;
-        border: 2px solid #e9d5ff !important;
-        border-radius: 12px !important;
-        padding: 12px 16px !important;
-        font-size: 15px !important;
+        border: 1px solid #cbd5e1 !important;
     }
-    
-    .stTextInput input:focus, .stTextArea textarea:focus, .stDateInput input:focus {
-        border-color: #a855f7 !important;
-        box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1) !important;
-    }
-    
-    .stTextInput label, .stTextArea label, .stDateInput label {
+
+    .stFileUploader section,
+    .stFileUploader section * {
         color: #0f172a !important;
-        font-weight: 600 !important;
-        font-size: 16px !important;
-        margin-bottom: 8px !important;
     }
     
-    /* Submit button */
-    .stButton > button {
-        background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%) !important;
-        color: white !important;
-        border: none !important;
-        padding: 14px 32px !important;
-        border-radius: 12px !important;
-        font-weight: 600 !important;
-        font-size: 16px !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3) !important;
-    }
-    
-    .stButton > button:hover {
-        background: linear-gradient(135deg, #9333ea 0%, #7e22ce 100%) !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(168, 85, 247, 0.4) !important;
-    }
-    
-    /* Info card */
-    .club-info-card {
-        background: linear-gradient(135deg, #f3e8ff 0%, #fae8ff 100%);
-        border-left: 4px solid #a855f7;
-        padding: 20px 24px;
-        border-radius: 12px;
-        margin-bottom: 30px;
-        box-shadow: 0 2px 8px rgba(168, 85, 247, 0.1);
-    }
-    
-    .club-info-title {
-        color: #6b21a8;
-        font-size: 16px;
-        font-weight: 700;
-        margin-bottom: 8px;
-    }
-    
-    .club-info-text {
-        color: #7e22ce;
-        font-size: 14px;
-        font-weight: 500;
-        line-height: 1.6;
-    }
-    
-    /* Form container */
-    .form-container {
-        background: white;
-        padding: 30px;
-        border-radius: 16px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-        border: 1px solid #f3e8ff;
-    }
-    
-    /* Tips section text fix */
-    .tips-section, .tips-section * {
+    /* Success/Error messages - ensure visibility */
+    .stSuccess, .stError, .stWarning, .stInfo {
         color: #0f172a !important;
     }
     
     /* Form submit button */
     button[type="submit"] {
-        background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%) !important;
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
         color: white !important;
         border: none !important;
-        padding: 14px 32px !important;
+        padding: 12px 32px !important;
         border-radius: 12px !important;
         font-weight: 600 !important;
         font-size: 16px !important;
@@ -143,143 +60,132 @@ def add_club_event_page():
     }
     
     button[type="submit"]:hover {
-        background: linear-gradient(135deg, #9333ea 0%, #7e22ce 100%) !important;
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
         transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(168, 85, 247, 0.4) !important;
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4) !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    # Header
-    st.markdown('<div class="club-event-header">🎉 Add Club / Society Event</div>', unsafe_allow_html=True)
-    st.markdown('<div class="club-event-subtitle">Share your upcoming events with the campus community</div>', unsafe_allow_html=True)
+    # ---------- HEADER ----------
+    st.markdown('<div class="add-notice-header">📢 Add Notice</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="add-notice-subtitle">Create and publish official campus notices</div>',
+        unsafe_allow_html=True
+    )
 
-    # Info card
-    st.markdown(f"""
-    <div class="club-info-card">
-        <div class="club-info-title">🎯 Club Member Access</div>
-        <div class="club-info-text">
-            You are logged in as a <strong>{st.session_state.user_club_role}</strong>. 
-            Your event will be visible to all students on the Notices page once published.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # ---------- FORM ----------
+    with st.form("add_notice_form", clear_on_submit=True):
 
-    # Form in a styled container
-    st.markdown('<div class="form-container">', unsafe_allow_html=True)
-    
-    with st.form("add_club_event_form", clear_on_submit=True):
-        st.markdown(
-            "<h3 style='color:#0f172a; font-weight:700;'>📝 Event Details</h3>",
-            unsafe_allow_html=True
-        )
-
-        
-        title = st.text_input(
-            "Event Title",
-            placeholder="e.g., Annual Cultural Fest 2025"
-        )
-        
+        title = st.text_input("Notice Title", placeholder="Enter notice title...")
         description = st.text_area(
-            "Event Description",
-            height=150,
-            placeholder="Provide a detailed description of your event, including activities, guest speakers, and what attendees can expect..."
+            "Notice Description",
+            height=120,
+            placeholder="Enter notice details here..."
         )
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            event_date = st.date_input("Event Date")
-        
-        with col2:
-            venue = st.text_input(
-                "Venue",
-                placeholder="e.g., Main Auditorium"
-            )
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        submit = st.form_submit_button("🚀 Publish Event", use_container_width=True)
+        uploaded_file = st.file_uploader(
+            "Attach PDF (optional)",
+            type=["pdf"],
+            help="Upload a PDF document (max 16MB)"
+        )
+
+        submit = st.form_submit_button("📤 Publish Notice", use_container_width=True)
 
         if submit:
-            if not title.strip() or not description.strip() or not venue.strip():
-                st.error("⚠️ All fields are required. Please fill in all details.")
+            if not title.strip():
+                st.error("⚠️ Notice title is required")
+            elif not description.strip():
+                st.error("⚠️ Notice description is required")
             else:
                 try:
+                    file_bytes = None
+                    file_name = None
+
+                    if uploaded_file:
+                        file_bytes = uploaded_file.read()
+                        file_name = uploaded_file.name
+                        
+                        # Check file size (16MB limit for PostgreSQL)
+                        if len(file_bytes) > 16 * 1024 * 1024:
+                            st.error("⚠️ File size exceeds 16MB limit. Please upload a smaller file.")
+                            return
+
                     conn = get_connection()
                     cursor = conn.cursor()
 
-                    # Use club_id instead of user_id for the foreign key
                     cursor.execute("""
-                        INSERT INTO club_events
-                        (title, description, event_date, venue, created_by)
-                        VALUES (%s, %s, %s, %s, %s)
+                        INSERT INTO notices
+                        (title, description, file_data, file_name, posted_by, created_at)
+                        VALUES (%s, %s, %s, %s, %s, %s)
                     """, (
                         title.strip(),
                         description.strip(),
-                        event_date,
-                        venue.strip(),
-                        st.session_state.user_club_id  # This is the club_id, not user_id
+                        psycopg2.Binary(file_bytes) if file_bytes else None,
+                        file_name,
+                        st.session_state.user_id,
+                        datetime.now()
                     ))
 
                     conn.commit()
                     cursor.close()
                     conn.close()
 
-                    st.success("🎉 Event published successfully! Students can now view it on the Notices page.")
+                    st.success("✅ Notice published successfully!")
                     st.balloons()
                     
+                    # Show a helpful message
+                    st.info("💡 Your notice is now visible in the Notices section")
+
                 except Exception as e:
-                    st.error(f"❌ Error publishing event: {str(e)}")
+                    st.error(f"❌ Error publishing notice: {str(e)}")
                     import traceback
                     with st.expander("View error details"):
                         st.code(traceback.format_exc())
     
-    st.markdown('</div>', unsafe_allow_html=True)
-    
+    # ---------- RECENT NOTICES ----------
     st.markdown("---")
-
-    st.markdown("""
-<div style="
-    background:#ffffff;
-    border:1px solid #e9d5ff;
-    border-radius:16px;
-    padding:24px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.06);
-">
-
-<h3 style="color:#0f172a; font-weight:800; margin-bottom:20px;">
-💡 Tips for Creating Great Event Posts
-</h3>
-
-<div style="display:flex; gap:24px; flex-wrap:wrap;">
-
-<div style="flex:1; min-width:220px;">
-<h4 style="color:#6b21a8; font-weight:700;">📝 Be Descriptive</h4>
-<ul style="color:#0f172a; font-size:14px; line-height:1.6;">
-<li>Include all key details</li>
-<li>Mention special guests</li>
-<li>Highlight unique features</li>
-</ul>
-</div>
-
-<div style="flex:1; min-width:220px;">
-<h4 style="color:#6b21a8; font-weight:700;">📅 Plan Ahead</h4>
-<ul style="color:#0f172a; font-size:14px; line-height:1.6;">
-<li>Post at least 1 week early</li>
-<li>Choose convenient timings</li>
-<li>Book venues in advance</li>
-</ul>
-</div>
-
-<div style="flex:1; min-width:220px;">
-<h4 style="color:#6b21a8; font-weight:700;">🎯 Engage Students</h4>
-<ul style="color:#0f172a; font-size:14px; line-height:1.6;">
-<li>Make it exciting</li>
-<li>Offer incentives</li>
-<li>Create buzz</li>
-</ul>
-</div>
-
-</div>
-</div>
-""", unsafe_allow_html=True)
+    st.markdown("### 📋 Recent Notices")
+    
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT title, created_at, file_name
+            FROM notices
+            ORDER BY created_at DESC
+            LIMIT 5
+        """)
+        
+        recent_notices = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        if recent_notices:
+            for idx, notice in enumerate(recent_notices, 1):
+                title_text = notice[0]
+                created_at = notice[1]
+                has_file = notice[2] is not None
+                
+                try:
+                    if isinstance(created_at, str):
+                        date_str = created_at
+                    else:
+                        date_str = created_at.strftime("%d %b %Y, %I:%M %p")
+                except:
+                    date_str = "Unknown date"
+                
+                file_icon = "📎" if has_file else "📄"
+                
+                st.markdown(f"""
+                <div style="background: #f8fafc; padding: 12px 16px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid #3b82f6;">
+                    <div style="color: #0f172a; font-weight: 600;">{file_icon} {title_text}</div>
+                    <div style="color: #64748b; font-size: 13px; margin-top: 4px;">📅 {date_str}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No notices published yet")
+            
+    except Exception as e:
+        st.warning(f"Could not load recent notices: {str(e)}")
