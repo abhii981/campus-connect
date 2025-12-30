@@ -211,23 +211,32 @@ def notices_page():
     st.markdown("<div class='notices-subheader'>Official campus notices & academic updates</div>", unsafe_allow_html=True)
 
     # Add a visual separator/divider
-    with separator:
-        st.markdown("""
-        <div style="width: 2px; 
-                background: linear-gradient(to bottom, #3b82f6, #a855f7); 
-                height: 100vh; 
-                min-height: 500px; 
-                border-radius: 2px;
-                box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);">
+    st.markdown("""
+    <div style="text-align: center; margin: 30px 0;">
+        <div style="display: inline-block; padding: 10px 30px; background: linear-gradient(135deg, #3b82f6 0%, #a855f7 100%); 
+                    border-radius: 50px; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);">
+            <span style="color: white; font-weight: 700; font-size: 14px; letter-spacing: 1px;">
+                📢 OFFICIAL NOTICES &nbsp;&nbsp; | &nbsp;&nbsp; 🎉 CLUB EVENTS
+            </span>
         </div>
-        """, unsafe_allow_html=True)
-
+    </div>
+    """, unsafe_allow_html=True)
 
     # Two column layout with visual separator
     left_col, separator, right_col = st.columns([10, 0.5, 10], gap="medium")
     
     # ==================== LEFT COLUMN: OFFICIAL NOTICES ====================
     with left_col:
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+                    padding: 12px 20px; border-radius: 12px 12px 0 0; margin-bottom: -10px;">
+            <div class='section-title' style="color: white; margin: 0;">📢 Official Notices</div>
+        </div>
+        <div style="background: #eff6ff; padding: 8px 20px; border-radius: 0 0 12px 12px; margin-bottom: 20px;">
+            <div class='section-subtitle' style="margin: 0; color: #1e40af;">Campus-wide announcements and updates</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
         try:
             conn = get_connection()
             cursor = conn.cursor()
@@ -241,92 +250,172 @@ def notices_page():
             cursor.close()
             conn.close()
 
-            if not notices:
+            if not notices or len(notices) == 0:
                 st.info("📭 No notices available yet.")
             else:
+                # Display notice count
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%); 
+                            padding: 10px 16px; 
+                            border-radius: 10px; 
+                            margin-bottom: 18px;
+                            border-left: 4px solid #3b82f6;">
+                    <span style="color: #1e40af; font-weight: 600; font-size: 13px;">
+                        📊 Total: <strong>{len(notices)}</strong> notices
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
+                
                 for idx, n in enumerate(notices):
                     notice_id, title, description, notice_url, created_at = n
 
-                    st.markdown("<div class='notices-card'>", unsafe_allow_html=True)
+                    with st.container():
+                        st.markdown("<div class='notices-card'>", unsafe_allow_html=True)
 
-                    # Date badge
-                    try:
-                        date_str = created_at.strftime('%d %b %Y')
-                        is_new = (datetime.now() - created_at).days <= 7
-                        badge = "<span class='new-indicator'>New</span>" if is_new else ""
-                        st.markdown(
-                            f"<div class='notices-badge'>📅 {date_str}{badge}</div>",
-                            unsafe_allow_html=True
-                        )
-                    except:
-                        pass
-
-                    st.markdown(f"<div class='notices-title'>{title}</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='notices-desc'>{description}</div>", unsafe_allow_html=True)
-
-                    if notice_url and os.path.exists(notice_url):
-                        col1, col2 = st.columns(2)
-
-                        with col1:
-                            with open(notice_url, "rb") as f:
-                                pdf_bytes = f.read()
-                            st.download_button(
-                                "📥 Download PDF",
-                                data=pdf_bytes,
-                                file_name=os.path.basename(notice_url),
-                                mime="application/pdf",
-                                key=f"dl_{idx}",
-                                use_container_width=True
+                        # Date badge
+                        try:
+                            if hasattr(created_at, 'strftime'):
+                                date_str = created_at.strftime('%d %b %Y')
+                                days_old = (datetime.now() - created_at).days
+                            else:
+                                date_str = str(created_at)[:10]
+                                days_old = 999
+                                
+                            is_new = days_old <= 7
+                            new_badge = "<span class='new-indicator'>New</span>" if is_new else ""
+                            
+                            st.markdown(
+                                f"<div class='notices-badge'>📅 {date_str}{new_badge}</div>",
+                                unsafe_allow_html=True
                             )
+                        except Exception as e:
+                            st.markdown("<div class='notices-badge'>📅 Recent</div>", unsafe_allow_html=True)
 
-                        with col2:
-                            if st.button("👁️ View PDF", key=f"view_{idx}", use_container_width=True):
-                                encoded = base64.b64encode(pdf_bytes).decode()
-                                st.markdown(
-                                    f"""
-                                    <iframe src="data:application/pdf;base64,{encoded}"
-                                    width="100%" height="600"></iframe>
-                                    """,
-                                    unsafe_allow_html=True
-                                )
-                    else:
-                        st.info("📄 No PDF attached to this notice")
+                        st.markdown(f"<div class='notices-title'>{title}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='notices-desc'>{description}</div>", unsafe_allow_html=True)
 
-                    st.markdown("</div>", unsafe_allow_html=True)
+                        # Check if file exists
+                        if notice_url and os.path.exists(notice_url):
+                            col1, col2 = st.columns(2)
+
+                            with col1:
+                                try:
+                                    with open(notice_url, "rb") as f:
+                                        pdf_bytes = f.read()
+                                    
+                                    st.download_button(
+                                        label="📥 Download PDF",
+                                        data=pdf_bytes,
+                                        file_name=os.path.basename(notice_url),
+                                        mime="application/pdf",
+                                        key=f"download_{notice_id}",
+                                        use_container_width=True
+                                    )
+                                except Exception as e:
+                                    st.error(f"Error: {str(e)}")
+
+                            with col2:
+                                if st.button("👁️ View PDF", key=f"view_{notice_id}", use_container_width=True):
+                                    try:
+                                        with open(notice_url, "rb") as f:
+                                            pdf_bytes = f.read()
+                                        
+                                        base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
+                                        st.markdown(
+                                            f"""
+                                            <iframe src="data:application/pdf;base64,{base64_pdf}"
+                                            width="100%" height="600px" style="border:none; border-radius: 12px; margin-top: 10px;"></iframe>
+                                            """,
+                                            unsafe_allow_html=True
+                                        )
+                                    except Exception as e:
+                                        st.error(f"Error displaying PDF: {str(e)}")
+                        else:
+                            st.info("📄 No PDF attached to this notice")
+
+                        st.markdown("</div>", unsafe_allow_html=True)
 
         except Exception as e:
             st.error(f"❌ Error loading notices: {str(e)}")
-
-    # ==================== RIGHT: CLUB EVENTS ====================
+            import traceback
+            with st.expander("Debug"):
+                st.code(traceback.format_exc())
+    
+    # ==================== SEPARATOR ====================
+    with separator:
+        st.markdown("""
+        <div style="width: 2px; 
+                    background: linear-gradient(to bottom, #3b82f6, #a855f7); 
+                    height: 100%; 
+                    min-height: 500px; 
+                    border-radius: 2px;
+                    box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);">
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # ==================== RIGHT COLUMN: CLUB EVENTS ====================
     with right_col:
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); 
+                    padding: 12px 20px; border-radius: 12px 12px 0 0; margin-bottom: -10px;">
+            <div class='section-title' style="color: white; margin: 0;">🎉 Societies & Clubs Events</div>
+        </div>
+        <div style="background: #faf5ff; padding: 8px 20px; border-radius: 0 0 12px 12px; margin-bottom: 20px;">
+            <div class='section-subtitle' style="margin: 0; color: #7e22ce;">Campus activities and events</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
         try:
             conn = get_connection()
+            
             events_df = pd.read_sql("""
                 SELECT title, description, event_date, venue
                 FROM club_events
                 ORDER BY event_date ASC
             """, conn)
             conn.close()
-
-            if events_df.empty:
-                st.info("🎭 No club events announced yet.")
-            else:
-                for _, row in events_df.iterrows():
-                    try:
-                        date_fmt = row["event_date"].strftime("%d %b %Y") if pd.notna(row["event_date"]) else "Date TBA"
-                    except:
-                        date_fmt = "Date TBA"
-
-                    st.markdown(f"""
-                    <div class="club-event-card">
-                        <div class="club-event-badge">🎯 Upcoming Event</div>
-                        <div class="club-event-title">{row['title']}</div>
-                        <div class="club-event-desc">{row['description']}</div>
-                        <div class="club-event-meta">
-                            📍 {row['venue']} • 📅 {date_fmt}
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
         except Exception as e:
+            conn.close()
             st.error(f"❌ Error loading events: {str(e)}")
+            events_df = pd.DataFrame()
+
+        if events_df.empty:
+            st.info("🎭 No club events announced yet.")
+        else:
+            # Display event count
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #f3e8ff 0%, #fae8ff 100%); 
+                        padding: 10px 16px; 
+                        border-radius: 10px; 
+                        margin-bottom: 18px;
+                        border-left: 4px solid #a855f7;">
+                <span style="color: #7e22ce; font-weight: 600; font-size: 13px;">
+                    🎪 Total: <strong>{len(events_df)}</strong> events
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            for _, row in events_df.iterrows():
+                # Format date
+                try:
+                    if pd.isna(row['event_date']):
+                        event_date_formatted = "Date TBA"
+                    elif isinstance(row['event_date'], str):
+                        event_date_formatted = row['event_date']
+                    else:
+                        event_date_formatted = row['event_date'].strftime('%d %b %Y')
+                except:
+                    event_date_formatted = "Date TBA"
+                
+                st.markdown(f"""
+                <div class="club-event-card">
+                    <div class="club-event-badge">🎯 Upcoming Event</div>
+                    <div class="club-event-title">{row['title']}</div>
+                    <div class="club-event-desc">
+                        {row['description']}
+                    </div>
+                    <div class="club-event-meta">
+                        📍 {row['venue']} &nbsp;&nbsp;•&nbsp;&nbsp; 📅 {event_date_formatted}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
