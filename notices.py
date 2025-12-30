@@ -211,16 +211,17 @@ def notices_page():
     st.markdown("<div class='notices-subheader'>Official campus notices & academic updates</div>", unsafe_allow_html=True)
 
     # Add a visual separator/divider
-    st.markdown("""
-    <div style="text-align: center; margin: 30px 0;">
-        <div style="display: inline-block; padding: 10px 30px; background: linear-gradient(135deg, #3b82f6 0%, #a855f7 100%); 
-                    border-radius: 50px; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);">
-            <span style="color: white; font-weight: 700; font-size: 14px; letter-spacing: 1px;">
-                📢 OFFICIAL NOTICES &nbsp;&nbsp; | &nbsp;&nbsp; 🎉 CLUB EVENTS
-            </span>
+    with separator:
+        st.markdown("""
+        <div style="width: 2px; 
+                background: linear-gradient(to bottom, #3b82f6, #a855f7); 
+                height: 100vh; 
+                min-height: 500px; 
+                border-radius: 2px;
+                box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);">
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+
 
     # Two column layout with visual separator
     left_col, separator, right_col = st.columns([10, 0.5, 10], gap="medium")
