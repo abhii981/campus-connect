@@ -310,7 +310,18 @@ def notices_page():
                         if has_file:
                             # Always show download button first
                             try:
-                                file_bytes = bytes(n["file_data"])
+                                # Handle PostgreSQL bytea - it might be memoryview, bytes, or bytearray
+                                file_data = n["file_data"]
+                                
+                                if isinstance(file_data, memoryview):
+                                    file_bytes = bytes(file_data)
+                                elif isinstance(file_data, bytearray):
+                                    file_bytes = bytes(file_data)
+                                elif isinstance(file_data, bytes):
+                                    file_bytes = file_data
+                                else:
+                                    # Try to convert to bytes
+                                    file_bytes = bytes(file_data)
                                 
                                 col1, col2 = st.columns(2)
                                 
@@ -350,6 +361,10 @@ def notices_page():
                                         
                             except Exception as e:
                                 st.error(f"Error loading file: {str(e)}")
+                                import traceback
+                                with st.expander("Debug info"):
+                                    st.code(f"File data type: {type(n.get('file_data'))}")
+                                    st.code(traceback.format_exc())
                         else:
                             st.info("📄 No PDF attached to this notice")
 
