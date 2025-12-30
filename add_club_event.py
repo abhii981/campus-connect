@@ -3,6 +3,9 @@ from db import get_connection
 
 def add_club_event_page():
 
+    # Show current user info for debugging
+    st.info(f"🔍 Debug: Logged in as User ID: {st.session_state.user_id} | Name: {st.session_state.name}")
+
     # 🔐 Security check - verify user is in club_users table
     try:
         conn = get_connection()
@@ -19,8 +22,24 @@ def add_club_event_page():
         if not result:
             cursor.close()
             conn.close()
+            
             st.error("🚫 Unauthorized access - This page is only accessible to club members")
-            st.info("💡 You need to be registered in a club to add events")
+            st.warning(f"❗ User ID {st.session_state.user_id} is not registered in any club")
+            st.info("💡 Contact admin to add you to a club or use a club member account (User ID 2 or 5)")
+            
+            # Show who IS in clubs
+            conn2 = get_connection()
+            cursor2 = conn2.cursor()
+            cursor2.execute("SELECT user_id, club_id, role_club FROM club_users")
+            club_members = cursor2.fetchall()
+            cursor2.close()
+            conn2.close()
+            
+            if club_members:
+                st.markdown("**Current club members:**")
+                for member in club_members:
+                    st.write(f"- User ID: {member[0]}, Club ID: {member[1]}, Role: {member[2]}")
+            
             st.stop()
         
         # Store club info
@@ -31,7 +50,10 @@ def add_club_event_page():
         conn.close()
         
     except Exception as e:
-        st.error(f"❌ Error verifying membership: {str(e)}")
+        st.error(f"❌ Database error: {str(e)}")
+        import traceback
+        with st.expander("Technical details"):
+            st.code(traceback.format_exc())
         st.stop()
 
     # Custom styling
@@ -203,7 +225,7 @@ def add_club_event_page():
                     conn = get_connection()
                     cursor = conn.cursor()
 
-                    # Insert with club_id as created_by
+                    # Insert with USER_ID as created_by (as requested)
                     cursor.execute("""
                         INSERT INTO club_events
                         (title, description, event_date, venue, created_by)
@@ -213,7 +235,7 @@ def add_club_event_page():
                         description.strip(),
                         event_date,
                         venue.strip(),
-                        user_club_id  # Use club_id, not user_id
+                        st.session_state.user_id  # Using user_id as you requested
                     ))
 
                     conn.commit()
@@ -222,6 +244,7 @@ def add_club_event_page():
 
                     st.success("🎉 Event published successfully!")
                     st.balloons()
+                    st.info(f"Event created by User ID: {st.session_state.user_id}")
                     
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
