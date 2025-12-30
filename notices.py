@@ -4,6 +4,7 @@ import base64
 from datetime import datetime, timedelta
 from db import get_connection
 import pandas as pd
+import io
 
 def notices_page():
     
@@ -241,7 +242,7 @@ def notices_page():
             conn = get_connection()
             cursor = conn.cursor()
 
-            # Fixed: Changed notice_url to file_data and file_name
+            # Get notices from database
             cursor.execute("""
                 SELECT notice_id, title, description, file_data, file_name, created_at
                 FROM notices
@@ -255,7 +256,7 @@ def notices_page():
             cursor.close()
             conn.close()
 
-            if not notices or len(notices) == 0:
+            if not notices:
                 st.info("📭 No notices available yet.")
             else:
                 # Display notice count
@@ -315,76 +316,76 @@ def notices_page():
                         st.markdown(f"<div class='notices-desc'>{n.get('description', 'No description')}</div>", unsafe_allow_html=True)
 
                         # Check if there's an attached file
-                        has_file = n.get("file_data") is not None and n.get("file_name")
+                        file_data = n.get("file_data")
+                        file_name = n.get("file_name")
+                        has_file = file_data is not None and file_name
                         
                         if has_file:
-                            # Always show download button first
                             try:
-                                # Handle PostgreSQL bytea - different formats
-                                file_data = n["file_data"]
+                                # Handle PostgreSQL bytea data
+                                file_bytes = None
                                 
-                                # PostgreSQL can return bytea as hex string (starts with \x) or as bytes
-                                if isinstance(file_data, str):
-                                    # It's a hex string like '\x255044462d...'
-                                    # Remove the '\x' prefix and convert hex to bytes
-                                    if file_data.startswith('\\x'):
-                                        hex_str = file_data[2:]  # Remove '\x'
-                                        file_bytes = bytes.fromhex(hex_str)
-                                    else:
-                                        # Try to encode as bytes
-                                        file_bytes = file_data.encode('latin-1')
+                                if isinstance(file_data, bytes):
+                                    # Already bytes
+                                    file_bytes = file_data
                                 elif isinstance(file_data, memoryview):
                                     file_bytes = bytes(file_data)
                                 elif isinstance(file_data, bytearray):
                                     file_bytes = bytes(file_data)
-                                elif isinstance(file_data, bytes):
-                                    file_bytes = file_data
+                                elif isinstance(file_data, str):
+                                    # If it's a hex string starting with \x
+                                    if file_data.startswith('\\x'):
+                                        # Remove \x prefix and convert hex to bytes
+                                        hex_str = file_data[2:]
+                                        file_bytes = bytes.fromhex(hex_str)
+                                    else:
+                                        # Try to encode as bytes
+                                        file_bytes = file_data.encode('latin-1')
                                 else:
-                                    # Last resort - try to convert to bytes
+                                    # Try to convert to bytes
                                     file_bytes = bytes(file_data)
                                 
-                                col1, col2 = st.columns(2)
-                                
-                                with col1:
-                                    # Download button - always visible
-                                    st.download_button(
-                                        label="📥 Download PDF",
-                                        data=file_bytes,
-                                        file_name=n.get("file_name", "notice.pdf"),
-                                        mime="application/pdf",
-                                        key=f"download_notice_{idx}",
-                                        use_container_width=True
-                                    )
-                                
-                                with col2:
-                                    # View button - toggles PDF display
-                                    if st.button("👁️ View PDF", key=f"view_notice_{idx}", use_container_width=True):
-                                        # Store in session state to keep it visible
-                                        if f"show_pdf_{idx}" not in st.session_state:
-                                            st.session_state[f"show_pdf_{idx}"] = True
-                                        else:
-                                            st.session_state[f"show_pdf_{idx}"] = not st.session_state[f"show_pdf_{idx}"]
-                                
-                                # Show PDF if toggled
-                                if st.session_state.get(f"show_pdf_{idx}", False):
-                                    try:
-                                        base64_pdf = base64.b64encode(file_bytes).decode('utf-8')
-                                        st.markdown(
-                                            f"""
-                                            <iframe src="data:application/pdf;base64,{base64_pdf}"
-                                            width="100%" height="600px" style="border:none; border-radius: 12px; margin-top: 10px;"></iframe>
-                                            """,
-                                            unsafe_allow_html=True
+                                if file_bytes and len(file_bytes) > 0:
+                                    col1, col2 = st.columns(2)
+                                    
+                                    with col1:
+                                        # Download button - always visible
+                                        st.download_button(
+                                            label="📥 Download PDF",
+                                            data=file_bytes,
+                                            file_name=file_name or "notice.pdf",
+                                            mime="application/pdf",
+                                            key=f"download_notice_{idx}",
+                                            use_container_width=True
                                         )
-                                    except Exception as e:
-                                        st.error(f"Error displaying PDF: {str(e)}")
+                                    
+                                    with col2:
+                                        # View button - toggles PDF display
+                                        if st.button("👁️ View PDF", key=f"view_notice_{idx}", use_container_width=True):
+                                            # Store in session state to keep it visible
+                                            if f"show_pdf_{idx}" not in st.session_state:
+                                                st.session_state[f"show_pdf_{idx}"] = True
+                                            else:
+                                                st.session_state[f"show_pdf_{idx}"] = not st.session_state[f"show_pdf_{idx}"]
+                                    
+                                    # Show PDF if toggled
+                                    if st.session_state.get(f"show_pdf_{idx}", False):
+                                        try:
+                                            base64_pdf = base64.b64encode(file_bytes).decode('utf-8')
+                                            st.markdown(
+                                                f"""
+                                                <iframe src="data:application/pdf;base64,{base64_pdf}"
+                                                width="100%" height="600px" style="border:none; border-radius: 12px; margin-top: 10px;"></iframe>
+                                                """,
+                                                unsafe_allow_html=True
+                                            )
+                                        except Exception as e:
+                                            st.error(f"Error displaying PDF: {str(e)}")
+                                else:
+                                    st.warning("⚠️ PDF file is empty or corrupted")
                                         
                             except Exception as e:
-                                st.error(f"Error loading file: {str(e)}")
-                                import traceback
-                                with st.expander("Debug info"):
-                                    st.code(f"File data type: {type(n.get('file_data'))}")
-                                    st.code(traceback.format_exc())
+                                st.error(f"Error processing PDF: {str(e)}")
                         else:
                             st.info("📄 No PDF attached to this notice")
 
@@ -393,7 +394,8 @@ def notices_page():
         except Exception as e:
             st.error(f"❌ Error loading notices: {str(e)}")
             import traceback
-            st.code(traceback.format_exc())
+            with st.expander("Debug Details"):
+                st.code(traceback.format_exc())
     
     # ==================== SEPARATOR ====================
     with separator:
@@ -421,55 +423,69 @@ def notices_page():
         
         try:
             conn = get_connection()
+            cursor = conn.cursor()
             
-            events_df = pd.read_sql("""
+            # Get club events with proper error handling
+            cursor.execute("""
                 SELECT title, description, event_date, venue
                 FROM club_events
                 ORDER BY event_date ASC
-            """, conn)
-            conn.close()
-        except Exception as e:
-            conn.close()
-            st.error(f"❌ Error loading events: {str(e)}")
-            events_df = pd.DataFrame()
-
-        if events_df.empty:
-            st.info("🎭 No club events announced yet.")
-        else:
-            # Display event count
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #f3e8ff 0%, #fae8ff 100%); 
-                        padding: 10px 16px; 
-                        border-radius: 10px; 
-                        margin-bottom: 18px;
-                        border-left: 4px solid #a855f7;">
-                <span style="color: #7e22ce; font-weight: 600; font-size: 13px;">
-                    🎪 Total: <strong>{len(events_df)}</strong> events
-                </span>
-            </div>
-            """, unsafe_allow_html=True)
+            """)
+            events = cursor.fetchall()
             
-            for _, row in events_df.iterrows():
-                # Format date
-                try:
-                    if pd.isna(row['event_date']):
-                        event_date_formatted = "Date TBA"
-                    elif isinstance(row['event_date'], str):
-                        event_date_formatted = row['event_date']
-                    else:
-                        event_date_formatted = row['event_date'].strftime('%d %b %Y')
-                except:
-                    event_date_formatted = "Date TBA"
-                
+            cursor.close()
+            conn.close()
+
+            if not events:
+                st.info("🎭 No club events announced yet.")
+            else:
+                # Display event count
                 st.markdown(f"""
-                <div class="club-event-card">
-                    <div class="club-event-badge">🎯 Upcoming Event</div>
-                    <div class="club-event-title">{row['title']}</div>
-                    <div class="club-event-desc">
-                        {row['description']}
-                    </div>
-                    <div class="club-event-meta">
-                        📍 {row['venue']} &nbsp;&nbsp;•&nbsp;&nbsp; 📅 {event_date_formatted}
-                    </div>
+                <div style="background: linear-gradient(135deg, #f3e8ff 0%, #fae8ff 100%); 
+                            padding: 10px 16px; 
+                            border-radius: 10px; 
+                            margin-bottom: 18px;
+                            border-left: 4px solid #a855f7;">
+                    <span style="color: #7e22ce; font-weight: 600; font-size: 13px;">
+                        🎪 Total: <strong>{len(events)}</strong> events
+                    </span>
                 </div>
                 """, unsafe_allow_html=True)
+                
+                for idx, event in enumerate(events):
+                    try:
+                        title = event[0] if len(event) > 0 else "Untitled Event"
+                        description = event[1] if len(event) > 1 else "No description"
+                        event_date = event[2] if len(event) > 2 else None
+                        venue = event[3] if len(event) > 3 else "Venue TBA"
+                        
+                        # Format date
+                        event_date_formatted = "Date TBA"
+                        if event_date:
+                            if hasattr(event_date, 'strftime'):
+                                event_date_formatted = event_date.strftime('%d %b %Y')
+                            elif isinstance(event_date, str):
+                                try:
+                                    date_obj = datetime.strptime(event_date, "%Y-%m-%d")
+                                    event_date_formatted = date_obj.strftime('%d %b %Y')
+                                except:
+                                    event_date_formatted = event_date
+                        
+                        st.markdown(f"""
+                        <div class="club-event-card">
+                            <div class="club-event-badge">🎯 Upcoming Event</div>
+                            <div class="club-event-title">{title}</div>
+                            <div class="club-event-desc">
+                                {description}
+                            </div>
+                            <div class="club-event-meta">
+                                📍 {venue} &nbsp;&nbsp;•&nbsp;&nbsp; 📅 {event_date_formatted}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                    except Exception as e:
+                        st.error(f"Error displaying event {idx+1}: {str(e)}")
+                        
+        except Exception as e:
+            st.error(f"❌ Error loading events: {str(e)}")
