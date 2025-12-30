@@ -308,16 +308,36 @@ def notices_page():
                         has_file = n.get("file_data") is not None and n.get("file_name")
                         
                         if has_file:
-                            col1, col2 = st.columns(2)
-                            
-                            with col1:
-                                # View button - show PDF in iframe
-                                if st.button("👁️ View PDF", key=f"view_notice_{idx}", use_container_width=True):
+                            # Always show download button first
+                            try:
+                                file_bytes = bytes(n["file_data"])
+                                
+                                col1, col2 = st.columns(2)
+                                
+                                with col1:
+                                    # Download button - always visible
+                                    st.download_button(
+                                        label="📥 Download PDF",
+                                        data=file_bytes,
+                                        file_name=n.get("file_name", "notice.pdf"),
+                                        mime="application/pdf",
+                                        key=f"download_notice_{idx}",
+                                        use_container_width=True
+                                    )
+                                
+                                with col2:
+                                    # View button - toggles PDF display
+                                    if st.button("👁️ View PDF", key=f"view_notice_{idx}", use_container_width=True):
+                                        # Store in session state to keep it visible
+                                        if f"show_pdf_{idx}" not in st.session_state:
+                                            st.session_state[f"show_pdf_{idx}"] = True
+                                        else:
+                                            st.session_state[f"show_pdf_{idx}"] = not st.session_state[f"show_pdf_{idx}"]
+                                
+                                # Show PDF if toggled
+                                if st.session_state.get(f"show_pdf_{idx}", False):
                                     try:
-                                        # Convert binary data to base64
-                                        file_bytes = bytes(n["file_data"])
                                         base64_pdf = base64.b64encode(file_bytes).decode('utf-8')
-                                        
                                         st.markdown(
                                             f"""
                                             <iframe src="data:application/pdf;base64,{base64_pdf}"
@@ -327,21 +347,9 @@ def notices_page():
                                         )
                                     except Exception as e:
                                         st.error(f"Error displaying PDF: {str(e)}")
-                            
-                            with col2:
-                                # Download button
-                                try:
-                                    file_bytes = bytes(n["file_data"])
-                                    st.download_button(
-                                        label="📥 Download PDF",
-                                        data=file_bytes,
-                                        file_name=n.get("file_name", "notice.pdf"),
-                                        mime="application/pdf",
-                                        key=f"download_notice_{idx}",
-                                        use_container_width=True
-                                    )
-                                except Exception as e:
-                                    st.error(f"Download error: {str(e)}")
+                                        
+                            except Exception as e:
+                                st.error(f"Error loading file: {str(e)}")
                         else:
                             st.info("📄 No PDF attached to this notice")
 
