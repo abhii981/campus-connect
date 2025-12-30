@@ -1,7 +1,10 @@
 import streamlit as st
 from db import get_connection
 from datetime import datetime
-import psycopg2
+import os
+
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 def add_notice_page():
 
@@ -42,27 +45,8 @@ def add_notice_page():
         color: #0f172a !important;
     }
     
-    /* Success/Error messages - ensure visibility */
     .stSuccess, .stError, .stWarning, .stInfo {
         color: #0f172a !important;
-    }
-    
-    /* Form submit button */
-    button[type="submit"] {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-        color: white !important;
-        border: none !important;
-        padding: 12px 32px !important;
-        border-radius: 12px !important;
-        font-weight: 600 !important;
-        font-size: 16px !important;
-        transition: all 0.3s ease !important;
-    }
-    
-    button[type="submit"]:hover {
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4) !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -87,7 +71,7 @@ def add_notice_page():
         uploaded_file = st.file_uploader(
             "Attach PDF (optional)",
             type=["pdf"],
-            help="Upload a PDF document (max 16MB)"
+            help="Upload a PDF document"
         )
 
         submit = st.form_submit_button("📤 Publish Notice", use_container_width=True)
@@ -95,89 +79,74 @@ def add_notice_page():
         if submit:
             if not title.strip():
                 st.error("⚠️ Notice title is required")
-            elif not description.strip():
+                return
+            if not description.strip():
                 st.error("⚠️ Notice description is required")
-            else:
-                try:
-                    file_bytes = None
-                    file_name = None
+                return
 
-                    if uploaded_file:
-                        file_bytes = uploaded_file.read()
-                        file_name = uploaded_file.name
-                        
-                        # Check file size (16MB limit for PostgreSQL)
-                        if len(file_bytes) > 16 * 1024 * 1024:
-                            st.error("⚠️ File size exceeds 16MB limit. Please upload a smaller file.")
-                            return
+            try:
+                notice_url = None
 
-                    conn = get_connection()
-                    cursor = conn.cursor()
+                if uploaded_file:
+                    file_path = os.path.join(UPLOAD_DIR, uploaded_file.name)
+                    with open(file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    notice_url = file_path
 
-                    cursor.execute("""
-                        INSERT INTO notices
-                        (title, description, file_data, file_name, posted_by, created_at)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """, (
-                        title.strip(),
-                        description.strip(),
-                        psycopg2.Binary(file_bytes) if file_bytes else None,
-                        file_name,
-                        st.session_state.user_id,
-                        datetime.now()
-                    ))
+                conn = get_connection()
+                cursor = conn.cursor()
 
-                    conn.commit()
-                    cursor.close()
-                    conn.close()
+                cursor.execute("""
+                    INSERT INTO notices
+                    (title, description, notice_url, posted_by, created_at)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (
+                    title.strip(),
+                    description.strip(),
+                    notice_url,
+                    st.session_state.user_id,
+                    datetime.now()
+                ))
 
-                    st.success("✅ Notice published successfully!")
-                    st.balloons()
-                    
-                    # Show a helpful message
-                    st.info("💡 Your notice is now visible in the Notices section")
+                conn.commit()
+                cursor.close()
+                conn.close()
 
-                except Exception as e:
-                    st.error(f"❌ Error publishing notice: {str(e)}")
-                    import traceback
-                    with st.expander("View error details"):
-                        st.code(traceback.format_exc())
-    
+                st.success("✅ Notice published successfully!")
+                st.balloons()
+                st.info("💡 Your notice is now visible in the Notices section")
+
+            except Exception as e:
+                st.error(f"❌ Error publishing notice: {str(e)}")
+
     # ---------- RECENT NOTICES ----------
     st.markdown("---")
     st.markdown("### 📋 Recent Notices")
-    
+
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        
+
         cursor.execute("""
-            SELECT title, created_at, file_name
+            SELECT title, created_at, notice_url
             FROM notices
             ORDER BY created_at DESC
             LIMIT 5
         """)
-        
+
         recent_notices = cursor.fetchall()
         cursor.close()
         conn.close()
-        
+
         if recent_notices:
-            for idx, notice in enumerate(recent_notices, 1):
-                title_text = notice[0]
-                created_at = notice[1]
-                has_file = notice[2] is not None
-                
+            for title_text, created_at, notice_url in recent_notices:
                 try:
-                    if isinstance(created_at, str):
-                        date_str = created_at
-                    else:
-                        date_str = created_at.strftime("%d %b %Y, %I:%M %p")
+                    date_str = created_at.strftime("%d %b %Y, %I:%M %p")
                 except:
                     date_str = "Unknown date"
-                
-                file_icon = "📎" if has_file else "📄"
-                
+
+                file_icon = "📎" if notice_url else "📄"
+
                 st.markdown(f"""
                 <div style="background: #f8fafc; padding: 12px 16px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid #3b82f6;">
                     <div style="color: #0f172a; font-weight: 600;">{file_icon} {title_text}</div>
@@ -186,6 +155,6 @@ def add_notice_page():
                 """, unsafe_allow_html=True)
         else:
             st.info("No notices published yet")
-            
+
     except Exception as e:
         st.warning(f"Could not load recent notices: {str(e)}")
