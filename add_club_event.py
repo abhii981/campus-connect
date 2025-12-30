@@ -16,29 +16,19 @@ def add_club_event_page():
         """, (st.session_state.user_id,))
         
         result = cursor.fetchone()
-        
-        if not result:
-            cursor.close()
-            conn.close()
-            st.error("🚫 Unauthorized access - This page is only accessible to club members")
-            st.info("💡 You need to be registered as a club member to add events")
-            st.stop()
-        
-        # Store club_id and role - result is a tuple (club_id, role_club)
-        club_id = result[0]
-        role_club = result[1]
-        
         cursor.close()
         conn.close()
         
-        st.session_state.user_club_id = club_id
-        st.session_state.user_club_role = role_club
+        if not result:
+            st.error("🚫 Unauthorized access - This page is only accessible to club members")
+            st.stop()
+        
+        # Store club_id in session state for use in form submission
+        st.session_state.user_club_id = result[0]
+        st.session_state.user_club_role = result[1]
         
     except Exception as e:
-        st.error(f"❌ Error verifying club membership: {str(e)}")
-        import traceback
-        with st.expander("Debug info"):
-            st.code(traceback.format_exc())
+        st.error(f"Error verifying club membership: {str(e)}")
         st.stop()
 
     # Custom styling
@@ -167,7 +157,7 @@ def add_club_event_page():
     <div class="club-info-card">
         <div class="club-info-title">🎯 Club Member Access</div>
         <div class="club-info-text">
-            You are logged in as a <strong>{st.session_state.user_club_role}</strong> (Club ID: {st.session_state.user_club_id}). 
+            You are logged in as a <strong>{st.session_state.user_club_role}</strong>. 
             Your event will be visible to all students on the Notices page once published.
         </div>
     </div>
