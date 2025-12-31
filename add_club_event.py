@@ -200,7 +200,7 @@ def add_club_event_page():
                     conn = get_connection()
                     cursor = conn.cursor()
 
-                    # Insert with USER_ID as created_by (as requested)
+                    # Insert with CLUB_ID as created_by (not user_id!)
                     cursor.execute("""
                         INSERT INTO club_events
                         (title, description, event_date, venue, created_by)
@@ -210,7 +210,7 @@ def add_club_event_page():
                         description.strip(),
                         event_date,
                         venue.strip(),
-                        st.session_state.user_id  # Using user_id as you requested
+                        user_club_id  # Use CLUB_ID from club_users table
                     ))
 
                     conn.commit()
@@ -219,7 +219,7 @@ def add_club_event_page():
 
                     st.success("🎉 Event published successfully!")
                     st.balloons()
-                    st.info(f"Event created by User ID: {st.session_state.user_id}")
+                    st.info(f"✅ Event added to club {user_club_id}")
                     
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
