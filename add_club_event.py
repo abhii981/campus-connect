@@ -3,9 +3,6 @@ from db import get_connection
 
 def add_club_event_page():
 
-    # Show current user info for debugging
-    st.info(f"🔍 Debug: Logged in as User ID: {st.session_state.user_id} | Name: {st.session_state.name}")
-
     # 🔐 Security check - verify user is in club_users table
     try:
         conn = get_connection()
@@ -21,45 +18,17 @@ def add_club_event_page():
         cursor.close()
         conn.close()
         
-        # Debug: Show what we got
-        st.write(f"🔍 Query result: {result}")
-        st.write(f"🔍 Result type: {type(result)}")
-        
         if result is None or not result:
             st.error("🚫 Unauthorized access - This page is only accessible to club members")
-            st.warning(f"❗ User ID {st.session_state.user_id} is not registered in any club")
-            st.info("💡 Contact admin to add you to a club or use a club member account")
-            
-            # Show who IS in clubs
-            conn2 = get_connection()
-            cursor2 = conn2.cursor()
-            cursor2.execute("SELECT user_id, club_id, role_club FROM club_users")
-            club_members = cursor2.fetchall()
-            cursor2.close()
-            conn2.close()
-            
-            if club_members:
-                st.markdown("**Current club members:**")
-                for member in club_members:
-                    st.write(f"- User ID: {member[0]}, Club ID: {member[1]}, Role: {member[2]}")
-            
+            st.info("💡 Contact admin to add you to a club")
             st.stop()
         
         # Store club info - result is a RealDictRow, access like dictionary
         user_club_id = result['club_id']
         user_club_role = result['role_club']
         
-        st.success(f"✅ Verified: Club ID {user_club_id}, Role: {user_club_role}")
-        
-    except IndexError as e:
-        st.error(f"❌ Error accessing result: {str(e)}")
-        st.write(f"Result was: {result}")
-        st.stop()
     except Exception as e:
-        st.error(f"❌ Database error: {str(e)}")
-        import traceback
-        with st.expander("Technical details"):
-            st.code(traceback.format_exc())
+        st.error(f"❌ Error: {str(e)}")
         st.stop()
 
     # Custom styling
