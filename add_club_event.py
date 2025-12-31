@@ -18,14 +18,17 @@ def add_club_event_page():
         """, (st.session_state.user_id,))
         
         result = cursor.fetchone()
+        cursor.close()
+        conn.close()
         
-        if not result:
-            cursor.close()
-            conn.close()
-            
+        # Debug: Show what we got
+        st.write(f"🔍 Query result: {result}")
+        st.write(f"🔍 Result type: {type(result)}")
+        
+        if result is None or not result:
             st.error("🚫 Unauthorized access - This page is only accessible to club members")
             st.warning(f"❗ User ID {st.session_state.user_id} is not registered in any club")
-            st.info("💡 Contact admin to add you to a club or use a club member account (User ID 2 or 5)")
+            st.info("💡 Contact admin to add you to a club or use a club member account")
             
             # Show who IS in clubs
             conn2 = get_connection()
@@ -42,13 +45,16 @@ def add_club_event_page():
             
             st.stop()
         
-        # Store club info
+        # Store club info - result is a tuple (club_id, role_club)
         user_club_id = result[0]
         user_club_role = result[1]
         
-        cursor.close()
-        conn.close()
+        st.success(f"✅ Verified: Club ID {user_club_id}, Role: {user_club_role}")
         
+    except IndexError as e:
+        st.error(f"❌ Error accessing result: {str(e)}")
+        st.write(f"Result was: {result}")
+        st.stop()
     except Exception as e:
         st.error(f"❌ Database error: {str(e)}")
         import traceback
