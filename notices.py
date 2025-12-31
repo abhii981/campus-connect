@@ -396,6 +396,11 @@ def notices_page():
             """, unsafe_allow_html=True)
             
             for _, row in events_df.iterrows():
+                # Get actual values from the row
+                event_title = row['title']
+                event_desc = row['description']
+                event_venue = row['venue']
+                
                 # Format date
                 try:
                     if pd.isna(row['event_date']):
@@ -410,12 +415,12 @@ def notices_page():
                 st.markdown(f"""
                 <div class="club-event-card">
                     <div class="club-event-badge">🎯 Upcoming Event</div>
-                    <div class="club-event-title">{row['title']}</div>
+                    <div class="club-event-title">{event_title}</div>
                     <div class="club-event-desc">
-                        {row['description']}
+                        {event_desc}
                     </div>
                     <div class="club-event-meta">
-                        📍 {row['venue']} &nbsp;&nbsp;•&nbsp;&nbsp; 📅 {event_date_formatted}
+                        📍 {event_venue} &nbsp;&nbsp;•&nbsp;&nbsp; 📅 {event_date_formatted}
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
