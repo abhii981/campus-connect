@@ -45,9 +45,9 @@ def add_club_event_page():
             
             st.stop()
         
-        # Store club info - result is a tuple (club_id, role_club)
-        user_club_id = result[0]
-        user_club_role = result[1]
+        # Store club info - result is a RealDictRow, access like dictionary
+        user_club_id = result['club_id']
+        user_club_role = result['role_club']
         
         st.success(f"✅ Verified: Club ID {user_club_id}, Role: {user_club_role}")
         
