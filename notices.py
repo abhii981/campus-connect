@@ -269,71 +269,72 @@ def notices_page():
                 for idx, n in enumerate(notices):
                     notice_id, title, description, notice_url, created_at = n
 
-                    with st.container():
-                        st.markdown("<div class='notices-card'>", unsafe_allow_html=True)
-
-                        # Date badge
-                        try:
-                            if hasattr(created_at, 'strftime'):
-                                date_str = created_at.strftime('%d %b %Y')
-                                days_old = (datetime.now() - created_at).days
-                            else:
-                                date_str = str(created_at)[:10]
-                                days_old = 999
-                                
-                            is_new = days_old <= 7
-                            new_badge = "<span class='new-indicator'>New</span>" if is_new else ""
+                    # Date badge
+                    try:
+                        if hasattr(created_at, 'strftime'):
+                            date_str = created_at.strftime('%d %b %Y')
+                            days_old = (datetime.now() - created_at).days
+                        else:
+                            date_str = str(created_at)[:10]
+                            days_old = 999
                             
-                            st.markdown(
-                                f"<div class='notices-badge'>📅 {date_str}{new_badge}</div>",
-                                unsafe_allow_html=True
-                            )
-                        except Exception as e:
-                            st.markdown("<div class='notices-badge'>📅 Recent</div>", unsafe_allow_html=True)
+                        is_new = days_old <= 7
+                        new_badge = "<span class='new-indicator'>New</span>" if is_new else ""
+                        
+                        date_badge_html = f"<div class='notices-badge'>📅 {date_str}{new_badge}</div>"
+                    except Exception as e:
+                        date_badge_html = "<div class='notices-badge'>📅 Recent</div>"
 
-                        st.markdown(f"<div class='notices-title'>{title}</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='notices-desc'>{description}</div>", unsafe_allow_html=True)
+                    # Build the notice card HTML
+                    notice_html = f"""
+                    <div class="notices-card">
+                        {date_badge_html}
+                        <div class='notices-title'>{title}</div>
+                        <div class='notices-desc'>{description}</div>
+                    """
+                    
+                    st.markdown(notice_html, unsafe_allow_html=True)
 
-                        # Check if file exists
-                        if notice_url and os.path.exists(notice_url):
-                            col1, col2 = st.columns(2)
+                    # Check if file exists and add buttons
+                    if notice_url and os.path.exists(notice_url):
+                        col1, col2 = st.columns(2)
 
-                            with col1:
+                        with col1:
+                            try:
+                                with open(notice_url, "rb") as f:
+                                    pdf_bytes = f.read()
+                                
+                                st.download_button(
+                                    label="📥 Download PDF",
+                                    data=pdf_bytes,
+                                    file_name=os.path.basename(notice_url),
+                                    mime="application/pdf",
+                                    key=f"download_{notice_id}",
+                                    use_container_width=True
+                                )
+                            except Exception as e:
+                                st.error(f"Download error: {str(e)}")
+
+                        with col2:
+                            if st.button("👁️ View PDF", key=f"view_{notice_id}", use_container_width=True):
                                 try:
                                     with open(notice_url, "rb") as f:
                                         pdf_bytes = f.read()
                                     
-                                    st.download_button(
-                                        label="📥 Download PDF",
-                                        data=pdf_bytes,
-                                        file_name=os.path.basename(notice_url),
-                                        mime="application/pdf",
-                                        key=f"download_{notice_id}",
-                                        use_container_width=True
+                                    base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
+                                    st.markdown(
+                                        f"""
+                                        <iframe src="data:application/pdf;base64,{base64_pdf}"
+                                        width="100%" height="600px" style="border:none; border-radius: 12px; margin-top: 10px;"></iframe>
+                                        """,
+                                        unsafe_allow_html=True
                                     )
                                 except Exception as e:
-                                    st.error(f"Error: {str(e)}")
+                                    st.error(f"View error: {str(e)}")
+                    else:
+                        st.info("📄 No PDF attached to this notice")
 
-                            with col2:
-                                if st.button("👁️ View PDF", key=f"view_{notice_id}", use_container_width=True):
-                                    try:
-                                        with open(notice_url, "rb") as f:
-                                            pdf_bytes = f.read()
-                                        
-                                        base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
-                                        st.markdown(
-                                            f"""
-                                            <iframe src="data:application/pdf;base64,{base64_pdf}"
-                                            width="100%" height="600px" style="border:none; border-radius: 12px; margin-top: 10px;"></iframe>
-                                            """,
-                                            unsafe_allow_html=True
-                                        )
-                                    except Exception as e:
-                                        st.error(f"Error displaying PDF: {str(e)}")
-                        else:
-                            st.info("📄 No PDF attached to this notice")
-
-                        st.markdown("</div>", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
 
         except Exception as e:
             st.error(f"❌ Error loading notices: {str(e)}")
